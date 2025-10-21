@@ -1,0 +1,271 @@
+# Automação de Infraestrutura com AWS CloudFormation
+
+## Introdução
+
+Este repositório documenta meu aprendizado sobre automação de infraestrutura com CloudFormation. Aqui exploro como transformar templates em processos automatizados e seguros.
+
+---
+
+## Automação vs IaC Básico
+
+IaC básico: Criar template e executar manualmente no console.
+
+IaC automatizado: Template versionado no Git, validado automaticamente, testado e deployado via pipeline com aprovações.
+
+---
+
+## O que são Change Sets
+
+Change Sets mostram exatamente o que vai mudar antes de aplicar updates em uma stack. É como um "preview" das mudanças.
+
+### Por que usar
+
+- Ver quais recursos serão criados, modificados ou deletados
+- Identificar mudanças que causam downtime
+- Revisar antes de executar
+- Cancelar se algo estiver errado
+
+### Processo básico
+
+```bash
+# Criar change set
+aws cloudformation create-change-set \
+  --stack-name minha-stack \
+  --change-set-name mudanca-v2 \
+  --template-body file://template-v2.yaml
+
+# Ver o que vai mudar
+aws cloudformation describe-change-set \
+  --stack-name minha-stack \
+  --change-set-name mudanca-v2
+
+# Executar se tudo estiver ok
+aws cloudformation execute-change-set \
+  --stack-name minha-stack \
+  --change-set-name mudanca-v2
+```
+
+---
+
+## Stack Policies
+
+Documentos JSON que protegem recursos específicos contra modificações ou deleção acidental.
+
+Exemplo protegendo banco de dados:
+
+```json
+{
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": "*",
+      "Action": "Update:*",
+      "Resource": "*"
+    },
+    {
+      "Effect": "Deny",
+      "Principal": "*",
+      "Action": ["Update:Replace", "Update:Delete"],
+      "Resource": "LogicalResourceId/BancoDados"
+    }
+  ]
+}
+```
+
+---
+
+## Drift Detection
+
+Detecta quando alguém faz mudanças manuais em recursos que deveriam ser gerenciados apenas via CloudFormation.
+
+```bash
+# Detectar drift
+aws cloudformation detect-stack-drift --stack-name minha-stack
+
+# Ver resultado
+aws cloudformation describe-stack-resource-drifts --stack-name minha-stack
+```
+
+---
+
+## Nested Stacks
+
+Permite dividir infraestrutura complexa em módulos reutilizáveis.
+
+Exemplo:
+- Stack de rede (VPC, subnets)
+- Stack de banco de dados
+- Stack de aplicação
+
+```yaml
+Resources:
+  NetworkStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://s3.amazonaws.com/bucket/network.yaml
+      Parameters:
+        CidrBlock: 10.0.0.0/16
+
+  DatabaseStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://s3.amazonaws.com/bucket/database.yaml
+      Parameters:
+        VPCId: !GetAtt NetworkStack.Outputs.VPCId
+```
+
+---
+
+## Pipeline CI/CD
+
+Fluxo típico de automação:
+
+1. Commit no Git
+2. Pipeline valida sintaxe
+3. Deploy em dev + testes
+4. Cria change set para produção
+5. Aprovação manual
+6. Deploy em produção
+7. Notificações automáticas
+
+---
+
+## Parametrização por Ambiente
+
+Um template, múltiplos ambientes. A diferença está nos parâmetros.
+
+**Template:**
+```yaml
+Parameters:
+  Environment:
+    Type: String
+    AllowedValues: [dev, staging, prod]
+  
+  InstanceType:
+    Type: String
+    Default: t3.micro
+
+Conditions:
+  IsProduction: !Equals [!Ref Environment, prod]
+
+Resources:
+  Instancia:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !If [IsProduction, t3.large, !Ref InstanceType]
+```
+
+**Arquivo dev:**
+```json
+[
+  {"ParameterKey": "Environment", "ParameterValue": "dev"},
+  {"ParameterKey": "InstanceType", "ParameterValue": "t3.micro"}
+]
+```
+
+**Arquivo prod:**
+```json
+[
+  {"ParameterKey": "Environment", "ParameterValue": "prod"},
+  {"ParameterKey": "InstanceType", "ParameterValue": "t3.large"}
+]
+```
+
+---
+
+## Rollback Automático
+
+CloudFormation desfaz mudanças automaticamente se algo falhar:
+
+- Criação: Se falhar, remove tudo
+- Update: Se falhar, volta ao estado anterior
+- Manual: Você pode reverter updates quando necessário
+
+---
+
+## Validação e Testes
+
+### Validar template
+```bash
+aws cloudformation validate-template --template-body file://template.yaml
+```
+
+### Linting
+```bash
+pip install cfn-lint
+cfn-lint template.yaml
+```
+
+### Testes de infraestrutura
+```python
+def test_instance_running():
+    ec2 = boto3.client('ec2')
+    response = ec2.describe_instances(
+        Filters=[{'Name': 'tag:Name', 'Values': ['WebServer']}]
+    )
+    assert response['Reservations'][0]['Instances'][0]['State']['Name'] == 'running'
+```
+
+---
+
+## Secrets e Segurança
+
+Nunca colocar senhas no template. Usar Secrets Manager.
+
+---
+
+## Boas Práticas
+
+Versionamento: Templates no Git sempre.
+
+Change Sets: Sempre revisar antes de aplicar em produção.
+
+Testes: Dev → Staging → Prod.
+
+Monitoramento: Configurar alertas de falhas.
+
+Rollback planejado: Documentar como reverter.
+
+Menor privilégio: Roles com apenas permissões necessárias.
+
+---
+
+## Troubleshooting
+
+### Ver logs detalhados
+```bash
+aws cloudformation describe-stack-events \
+  --stack-name minha-stack \
+  --output table
+```
+
+### Stack travada
+```bash
+aws cloudformation continue-update-rollback --stack-name minha-stack
+```
+
+### Detectar drift periódico
+```bash
+aws cloudformation detect-stack-drift --stack-name prod-stack
+```
+
+---
+
+##Revisão
+
+- Change Sets evitam surpresas em produção
+- Automação traz consistência, não apenas velocidade
+- Testes de infraestrutura são essenciais
+- Parametrização permite reutilizar templates
+- Rollback automático é rede de segurança crucial
+- Secrets nunca devem estar hardcoded
+
+A automação transforma IaC em prática robusta e escalável.
+
+---
+
+## Recursos
+
+- [CloudFormation Documentation](https://docs.aws.amazon.com/cloudformation/)
+- [CloudFormation Best Practices](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/best-practices.html)
+- [cfn-lint GitHub](https://github.com/aws-cloudformation/cfn-lint)
