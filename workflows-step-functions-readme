@@ -1,0 +1,232 @@
+# AWS Step Functions
+
+## Introdução
+
+Este repositório documenta meu estudo sobre AWS Step Functions, um serviço que permite criar e gerenciar fluxos de trabalho automatizados na AWS.
+
+---
+
+## O que é AWS Step Functions
+
+Step Functions é um serviço de orquestração que coordena múltiplos serviços AWS em fluxos de trabalho visuais. Você define uma sequência de passos e o Step Functions executa na ordem correta, lida com erros e tenta novamente quando necessário.
+
+A grande vantagem é que você não precisa escrever código para gerenciar a coordenação entre serviços. O Step Functions faz isso automaticamente.
+
+---
+
+## Conceitos Básicos
+
+### State Machine
+
+Uma State Machine é o fluxo de trabalho completo.
+
+Por exemplo, um fluxo para processar um pedido poderia ter estas etapas:
+1. Validar dados do pedido
+2. Verificar estoque
+3. Processar pagamento
+4. Confirmar pedido
+5. Enviar email
+
+### Estados (States)
+
+Cada etapa no fluxo é chamada de estado. Existem vários tipos:
+
+ Task: Executa uma tarefa, como chamar uma função Lambda ou salvar dados no DynamoDB.
+
+ Choice: Toma uma decisão baseada em condições. Por exemplo, "se o valor for maior que 1000, enviar para aprovação manual".
+
+ Wait: Pausa o fluxo por um tempo determinado.
+
+ Parallel: Executa várias tarefas ao mesmo tempo.
+
+ Map: Processa uma lista de itens, executando a mesma ação para cada um.
+
+ Succeed/Fail: Indica que o fluxo terminou com sucesso ou com erro.
+
+---
+
+## Tipos de Workflows
+
+Existem dois tipos principais:
+
+### Standard Workflows
+
+- Podem durar até 1 ano
+- Executam exatamente uma vez
+- Mantêm histórico completo de execução
+- Ideais para processos longos e complexos
+
+### Express Workflows
+
+- Duram no máximo 5 minutos
+- Executam pelo menos uma vez (podem repetir)
+- Mais rápidos e baratos
+- Ideais para alta quantidade de execuções
+
+---
+
+## Integrações com Serviços AWS
+
+Step Functions se integra diretamente com vários serviços:
+
+ AWS Lambda: Para executar código customizado.
+
+ Amazon S3: Para ler ou gravar arquivos.
+
+ DynamoDB: Para trabalhar com banco de dados.
+
+ SNS: Para enviar notificações.
+
+ SQS: Para trabalhar com filas de mensagens.
+
+ ECS: Para executar containers.
+
+Essa integração nativa significa que você pode chamar esses serviços sem precisar escrever código de conexão.
+
+---
+
+## Casos de Uso Práticos
+
+### Processamento de Arquivo
+
+Caso comum -> quando alguém faz upload de um arquivo no S3:
+1. Upload dispara o Step Functions
+2. Lambda valida o formato do arquivo
+3. Se válido, processa os dados
+4. Salva resultados no DynamoDB
+5. Envia notificação por email
+
+### Aprovação de Despesas
+
+Para um sistema de reembolso:
+1. Funcionário submete despesa
+2. Sistema valida documentos
+3. Se valor alto, aguarda aprovação manual
+4. Se aprovado, processa reembolso
+5. Notifica funcionário
+
+### Pipeline de Dados
+
+Para processar dados diariamente:
+1. CloudWatch dispara o fluxo em horário específico
+2. Lambda busca dados no S3
+3. Valida formato
+4. Para cada linha do arquivo, processa e salva
+5. Gera relatório final
+6. Envia por email
+
+---
+
+## Tratamento de Erros: como o Step Functions lida com erros automaticamente
+
+### Retry
+
+Você pode configurar para tentar novamente quando algo falha. Por exemplo, se uma chamada de API falhar por timeout, o sistema tenta de novo após alguns segundos. Isso é configurável: quantas vezes tentar, quanto tempo esperar entre tentativas etc.
+
+### Catch
+
+Se mesmo após várias tentativas ainda houver erro, você pode definir o que fazer. Por exemplo, enviar uma notificação para a equipe ou registrar o erro em um log.
+
+---
+
+## Formato JSON
+
+Step Functions usa um formato chamado Amazon States Language (ASL) para definir workflows. É JSON, o que torna relativamente fácil de ler e escrever.
+
+---
+
+## Workflow Studio
+
+A AWS oferece uma ferramenta visual chamada Workflow Studio onde você pode arrastar e soltar estados para criar o fluxo. Isso facilita muito, especialmente no começo, porque você não precisa escrever JSON manualmente: O Studio gera o código JSON automaticamente conforme você monta o diagrama visual.
+
+---
+
+## Monitoramento
+
+Step Functions se integra com CloudWatch, permitindo acompanhar:
+- Quantas execuções foram bem-sucedidas
+- Quantas falharam
+- Quanto tempo cada execução demorou
+- Onde exatamente ocorreu um erro
+
+No console, você pode ver o fluxo visual com cada estado destacado conforme executa, facilitando entender o que está acontecendo.
+
+---
+
+## Custos
+
+A precificação depende do tipo de workflow:
+
+- Standard: Cobra por transição entre estados. As primeiras 4.000 transições por mês são gratuitas.
+
+- Express: Cobra por execução e duração. Mais barato para alto volume de execuções rápidas.
+
+Para controlar custos, é importante deletar workflows de teste que não são mais necessários e escolher o tipo certo para cada caso.
+
+---
+
+## Boas Práticas
+
+ - Nomear claramente: Dar nomes descritivos aos estados facilita entender o fluxo.
+
+ - Usar timeouts: Sempre definir quanto tempo máximo um estado pode demorar.
+
+ - Implementar retry: Configurar retry para operações que podem falhar temporariamente.
+
+ - Modularizar: Para workflows muito complexos, melhor dividir em workflows menores.
+
+ - Documentar: Usar o campo "Comment" para explicar o que cada parte faz.
+
+ - Testar : Sempre testar o workflow completo antes de usar em produção.
+
+---
+
+## Quando Usar Step Functions
+
+- Quando precisa coordenar vários serviços AWS
+- O fluxo tem várias etapas
+- Há necessidade de retry e tratamento de erro robusto
+- Quando é importante ter histórico e auditoria das execuções
+
+Não é necessário para:
+- Tarefas muito simples que uma única função Lambda resolve
+- Quando latência extremamente baixa é crítica
+- Processos que não precisam de coordenação
+
+---
+
+## Exemplo Prático: Processamento de Imagem
+
+Para entender melhor, pensei em um exemplo de upload de foto:
+
+1. Usuário faz upload no S3
+2. S3 dispara Step Functions
+3. Lambda verifica se é uma imagem válida
+4. Se válido, executa em paralelo:
+   - Gera thumbnail
+   - Redimensiona para web
+   - Extrai metadados
+5. Salva resultados no DynamoDB
+6. Envia notificação de conclusão
+
+Cada etapa pode falhar e ser retentada automaticamente.
+
+---
+
+##Revisão
+
+- Orquestração visual facilita muito o entendimento de processos complexos
+- Tratamento automático de erro reduz código e aumenta confiabilidade
+- Integração nativa com serviços AWS economiza tempo de desenvolvimento
+- Monitoramento integrado ajuda na identificação de problemas
+- Escolher o tipo certo de workflow (Standard vs Express) impacta custos
+
+Step Functions resolve um problema real: coordenar múltiplos serviços sem precisar escrever código complexo de gerenciamento.
+
+---
+
+## Recursos Utilizados
+
+- [AWS Step Functions Documentation](https://docs.aws.amazon.com/step-functions/)
+- [Amazon States Language](https://states-language.net/)
+- [Step Functions Workshop](https://catalog.workshops.aws/stepfunctions)
