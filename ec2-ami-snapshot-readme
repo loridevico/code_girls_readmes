@@ -1,6 +1,4 @@
-# Aprendizado sobre EC2: AMIs e Snapshots
-
-## Introdução
+#EC2: AMIs e Snapshots
 
 Este repositório documenta meu aprendizado sobre gerenciamento de instâncias EC2 na AWS, focando em dois conceitos importantes: Amazon Machine Images (AMIs) e Snapshots EBS. 
 
@@ -12,7 +10,7 @@ O Amazon EC2 é um serviço que permite criar servidores virtuais na nuvem. A gr
 
 ---
 
-## O que São Amazon Machine Images (AMIs)são
+## O que São Amazon Machine Images (AMIs)
 
 Uma AMI é como um "molde" para criar instâncias EC2. Ela contém o sistema operacional, aplicativos instalados e todas as configurações necessárias. Quando você cria uma AMI, está basicamente tirando uma foto do seu servidor que pode ser usada para criar cópias idênticas.
 
@@ -45,8 +43,6 @@ O processo é relativamente simples:
 
 ### Boas práticas
 
-Aprendi algumas práticas importantes:
-
 - Usar nomes claros nas AMIs para identificar facilmente o que cada uma contém
 - Criar AMIs novas periodicamente para incluir atualizações de segurança
 - Deletar AMIs antigas que não são mais necessárias
@@ -54,15 +50,11 @@ Aprendi algumas práticas importantes:
 
 ---
 
-## Snapshots EBS
-
-### O que são
+## O que são Snapshots EBS
 
 Snapshots são backups dos volumes de armazenamento (discos) das instâncias EC2. Diferente de um backup tradicional que copia tudo sempre, os snapshots são incrementais: o primeiro copia tudo, e os seguintes copiam apenas o que mudou.
 
 ### Diferença entre Snapshot e AMI
-
-Essa foi uma dúvida que tive no início:
 
 - Snapshot: É um backup de um disco específico. Contém apenas os dados.
 - AMI: É um template completo para criar instâncias. Usa snapshots, mas também inclui configurações do sistema.
@@ -71,15 +63,13 @@ Quando você cria uma AMI, a AWS automaticamente cria snapshots dos discos da in
 
 ### Casos de uso
 
-Backup de dados: Criar snapshots regularmente dos volumes importantes protege contra perda de dados.
+- Backup de dados: Criar snapshots regularmente dos volumes importantes protege contra perda de dados.
 
-Testes: Posso criar um volume novo a partir de um snapshot de produção e testar mudanças sem risco.
+- Testes: Posso criar um volume novo a partir de um snapshot de produção e testar mudanças sem risco.
 
-Migração: Snapshots podem ser copiados para outras regiões da AWS.
+- Migração: Snapshots podem ser copiados para outras regiões da AWS.
 
 ### Como funciona
-
-Para trabalhar com snapshots:
 
 1. No console AWS, selecionar o volume que quero fazer backup
 2. Criar o snapshot (isso acontece em background)
@@ -94,7 +84,7 @@ Snapshots são cobrados por quanto espaço ocupam no S3. Como são incrementais,
 
 ## Relação entre AMIs e Snapshots
 
-Entendi que AMIs e snapshots funcionam juntos. Quando crio uma AMI, a AWS cria snapshots dos discos automaticamente. Esses snapshots ficam vinculados à AMI.
+AMIs e snapshots funcionam juntos. Quando crio uma AMI, a AWS cria snapshots dos discos automaticamente. Esses snapshots ficam vinculados à AMI.
 
 Uma coisa importante: se deletar a AMI, os snapshots não são deletados automaticamente. É preciso gerenciar isso separadamente.
 
@@ -104,7 +94,7 @@ Uma coisa importante: se deletar a AMI, os snapshots não são deletados automat
 
 ### Criptografia
 
-Volumes podem ser criptografados. Quando crio snapshot de um volume criptografado, o snapshot também fica criptografado automaticamente.
+Volumes podem ser criptografados. Quando criar snapshot de um volume criptografado, o snapshot também fica criptografado automaticamente.
 
 ### Controle de acesso
 
@@ -114,7 +104,7 @@ Volumes podem ser criptografados. Quando crio snapshot de um volume criptografad
 
 ## Estratégia de Backup
 
-Existem dois tipos de backup:
+Existem dois tipos:
 
 - Backup do sistema completo (AMI): Guarda tudo -> sistema operacional, aplicativos e dados. Útil para recuperação completa.
 
