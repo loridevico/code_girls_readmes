@@ -1,0 +1,369 @@
+#AWS CloudFormation
+
+## Introdução
+
+Este repositório documenta meu estudo sobre AWS CloudFormation, ferramenta que permite criar e gerenciar infraestrutura AWS usando código.
+
+---
+
+## O que é AWS CloudFormation
+
+CloudFormation é um serviço que permite descrever recursos AWS em um arquivo de texto (template) e deixar a AWS criar tudo automaticamente. Em vez de clicar no console para criar cada recurso manualmente, você escreve um template e o CloudFormation provisiona tudo de uma vez.
+
+A principal vantagem é poder versionar, reutilizar e replicar ambientes completos de forma consistente.
+
+---
+
+## Infraestrutura como Código (IaC)
+
+IaC é tratar infraestrutura da mesma forma que tratamos código de software:
+
+- Versionar em Git
+- Fazer code review
+- Testar antes de aplicar
+- Documentar através do próprio código
+- Replicar facilmente
+
+Isso traz previsibilidade e reduz erros humanos que acontecem ao criar recursos manualmente.
+
+---
+
+## Conceitos Fundamentais
+
+### Template
+
+É o arquivo que descreve a infraestrutura. Pode ser escrito em YAML ou JSON. YAML é geralmente preferido por ser mais legível.
+
+Um template básico tem estas seções:
+
+AWSTemplateFormatVersion: Versão do formato (normalmente "2010-09-09")
+
+Description: Descrição do que o template faz
+
+Parameters: Valores que podem ser passados ao criar a stack (como tamanho da instância)
+
+Resources: Os recursos AWS que serão criados (obrigatório)
+
+Outputs: Valores retornados após criação (como IP público da instância)
+
+### Stack
+
+Uma stack é uma coleção de recursos AWS criados a partir de um template. Quando você "lança" um template, o CloudFormation cria uma stack.
+
+Todos os recursos da stack são gerenciados juntos. Se você deletar a stack, todos os recursos são removidos.
+
+### Stack Set
+
+Permite criar stacks em múltiplas contas e regiões AWS simultaneamente. Útil para organizações grandes.
+
+---
+
+## Estrutura de um Template
+
+Um exemplo simples em YAML:
+
+```yaml
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Minha primeira stack - instância EC2 simples
+
+Parameters:
+  TipoInstancia:
+    Type: String
+    Default: t3.micro
+    Description: Tipo da instancia EC2
+
+Resources:
+  MinhaInstancia:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref TipoInstancia
+      ImageId: ami-0c55b159cbfafe1f0
+      Tags:
+        - Key: Name
+          Value: ServidorWeb
+
+Outputs:
+  IPPublico:
+    Description: IP publico da instancia
+    Value: !GetAtt MinhaInstancia.PublicIp
+```
+
+Este template cria uma instância EC2 e retorna seu IP público.
+
+---
+
+## Exemplo Prático: Servidor Web
+
+Para entender melhor, um exemplo de criação de servidor web completo:
+
+### Recursos Necessários
+
+1. Instância EC2
+2. Security Group (para permitir HTTP)
+3. Script de inicialização (para instalar servidor web)
+
+### Template Comentado
+
+```yaml
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Servidor web com Apache
+
+Parameters:
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: Par de chaves para SSH
+
+Resources:
+  # Security Group - permite HTTP
+  SecurityGroupWeb:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Permite HTTP
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+
+  # Instância EC2
+  ServidorWeb:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t3.micro
+      ImageId: ami-0c55b159cbfafe1f0
+      KeyName: !Ref KeyName
+      SecurityGroups:
+        - !Ref SecurityGroupWeb
+      UserData:
+        Fn::Base64: |
+          #!/bin/bash
+          yum update -y
+          yum install -y httpd
+          systemctl start httpd
+          systemctl enable httpd
+          echo "<h1>Servidor Web CloudFormation</h1>" > /var/www/html/index.html
+      Tags:
+        - Key: Name
+          Value: WebServer
+
+Outputs:
+  URLPublica:
+    Description: URL do servidor web
+    Value: !Sub 'http://${ServidorWeb.PublicDnsName}'
+```
+
+---
+
+## Funções Intrínsecas
+
+CloudFormation oferece funções especiais para trabalhar com dados:
+
+!Ref: Referencia outro recurso ou parâmetro
+```yaml
+InstanceType: !Ref TipoInstancia
+```
+
+!GetAtt: Obtém atributo de um recurso
+```yaml
+Value: !GetAtt MinhaInstancia.PublicIp
+```
+
+!Sub: Substitui variáveis em strings
+```yaml
+Value: !Sub 'http://${MinhaInstancia.PublicDnsName}'
+```
+
+!Join: Junta strings
+```yaml
+!Join [ ':', [ 'arn:aws:s3:::bucket', !Ref NomeBucket ] ]
+```
+
+!If: Condicional
+```yaml
+!If [ Condicao, ValorSeVerdadeiro, ValorSeFalso ]
+```
+
+---
+
+## Ciclo de Vida de uma Stack
+
+### Criação
+
+1. Escrever o template
+2. Validar sintaxe (localmente ou via AWS CLI)
+3. Fazer upload do template
+4. Definir parâmetros
+5. CloudFormation cria recursos na ordem correta
+6. Stack fica no estado "CREATE_COMPLETE"
+
+### Atualização
+
+Quando você modifica o template:
+1. CloudFormation compara versão atual com nova
+2. Identifica o que precisa mudar
+3. Atualiza apenas o necessário
+4. Alguns recursos são atualizados sem downtime
+5. Outros precisam ser recriados
+
+### Delete
+
+Ao deletar uma stack:
+1. CloudFormation remove todos os recursos
+2. Na ordem correta (respeitando dependências)
+3. Alguns recursos podem ter proteção contra deleção
+
+---
+
+## Boas Práticas
+
+### Organização
+
+Usar parâmetros: Para valores que mudam entre ambientes (dev, prod)
+
+Outputs bem definidos: Retornar informações importantes como URLs, IPs
+
+Tags consistentes: Facilita organização e controle de custos
+
+Descrições claras: Em cada recurso e parâmetro
+
+### Segurança
+
+Não colocar senhas no template: Usar AWS Secrets Manager ou Parameter Store
+
+Princípio do menor privilégio: Security Groups restritivos
+
+Revisar mudanças: Usar Change Sets antes de aplicar atualizações
+
+### Desenvolvimento
+
+Versionar templates: Usar Git para controle de versão
+
+Testar em ambiente separado: Antes de aplicar em produção
+
+Começar simples: Criar templates pequenos e expandir gradualmente
+
+Modularizar: Usar nested stacks para templates complexos
+
+---
+
+## Vantagens do CloudFormation
+
+- Reprodutibilidade: O mesmo template sempre cria a mesma infraestrutura
+
+- Velocidade: Criar ambientes completos em minutos
+
+- Consistência: Elimina variações causadas por configuração manual
+
+- Rastreabilidade: Histórico completo de mudanças
+
+- Rollback automático: Se algo falhar, CloudFormation desfaz as mudanças
+
+- Sem custo adicional: Você paga apenas pelos recursos criados
+
+---
+
+## Comparação com Alternativas
+
+### CloudFormation vs Console Manual
+
+- Manual: Rápido para testar, mas difícil de replicar e documentar
+
+- CloudFormation: Initial setup mais demorado, mas infinitamente replicável
+
+### CloudFormation vs Terraform
+
+CloudFormation: 
+- Nativo AWS
+- Não precisa instalar nada
+- Integração profunda com serviços AWS
+
+Terraform:
+- Multi-cloud
+- Linguagem própria (HCL)
+- Comunidade grande
+
+---
+
+## Limitações e Desafios
+
+Curva de aprendizado: Leva tempo para aprender a sintaxe e recursos disponíveis
+
+Debugging: Às vezes erros não são claros, precisa consultar logs detalhados
+
+Limites de tamanho: Templates têm limite de 51.200 bytes (use S3 para templates maiores)
+
+Ordem de criação: CloudFormation decide a ordem, às vezes precisa usar DependsOn
+
+Updates complexos: Alguns recursos não suportam updates in-place
+
+---
+
+## Ferramentas Úteis
+
+### AWS CLI
+
+Para criar stack via linha de comando:
+```bash
+aws cloudformation create-stack \
+  --stack-name minha-stack \
+  --template-body file://template.yaml \
+  --parameters ParameterKey=KeyName,ParameterValue=minha-chave
+```
+
+Para validar template:
+```bash
+aws cloudformation validate-template \
+  --template-body file://template.yaml
+```
+
+### CloudFormation Designer
+
+Ferramenta visual no console AWS para criar templates arrastando recursos. Útil para aprender, mas na prática escrever YAML direto é mais eficiente.
+
+---
+
+## Troubleshooting Comum
+
+- Stack fica em ROLLBACK_IN_PROGRESS: Algo falhou durante criação. Verificar eventos da stack para identificar o recurso problemático.
+
+- Erro de permissões: O usuário/role precisa ter permissões para criar os recursos especificados.
+
+- Dependências não resolvidas: Usar DependsOn quando CloudFormation não identifica dependências automaticamente.
+
+- Template inválido: Usar validate-template para checar sintaxe antes de criar stack.
+
+- Recursos não deletam: Alguns recursos têm proteção ou dependências externas. Pode ser necessário deletar manualmente.
+
+---
+
+## Principais Aprendizados
+
+- IaC traz consistência e reprodutibilidade que configuração manual não oferece
+- Templates podem ser complexos no início, mas tornam gerenciamento muito mais fácil
+- Versionamento de infraestrutura é tão importante quanto versionamento de código
+- CloudFormation gerencia dependências entre recursos automaticamente
+- Rollback automático reduz risco de deixar ambiente em estado inconsistente
+
+A maior barreira é o tempo inicial de aprendizado, mas o retorno compensa em ambientes que precisam de múltiplas réplicas ou mudanças frequentes.
+
+---
+
+## Próximos Passos
+
+- Explorar nested stacks para modularizar templates complexos
+- Estudar CloudFormation Macros para templates dinâmicos
+- Praticar criação de Change Sets antes de updates
+- Integrar com pipelines CI/CD
+- Explorar AWS CDK (Cloud Development Kit) como alternativa de alto nível
+
+---
+
+## Recursos Utilizados
+
+- [AWS CloudFormation Documentation](https://docs.aws.amazon.com/cloudformation/)
+- [CloudFormation Template Reference](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/template-reference.html)
+- [CloudFormation Best Practices](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/best-practices.html)
