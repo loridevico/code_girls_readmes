@@ -30,19 +30,19 @@ Isso permite workflows automáticos de processamento.
 
 ##Casos de Uso
 
-### Processamento de Imagens
+###Processamento de Imagens
 
 1. Upload de foto no S3
 2. Lambda redimensiona automaticamente
 3. Salva resultado em outro bucket
 
-### Validação de Arquivos
+###Validação de Arquivos
 
 1. Upload de CSV
 2. Lambda valida formato
 3. Move para "processados" ou "erro"
 
-### Backup Automatizado
+###Backup Automatizado
 
 1. Arquivo salvo no bucket primário
 2. Lambda copia para outra região automaticamente
@@ -165,7 +165,7 @@ CloudWatch captura automaticamente:
 
 ---
 
-## Limitações
+##Limitações
 
 **Lambda**:
 - Tempo máximo: 15 minutos
@@ -179,7 +179,7 @@ CloudWatch captura automaticamente:
 
 ---
 
-## Principais Aprendizados
+##Revisão
 
 - Lambda + S3 automatiza processamento sem servidores
 - Event-driven architecture simplifica coordenação
@@ -190,7 +190,7 @@ CloudWatch captura automaticamente:
 
 ---
 
-## Recursos
+##Recursos
 
 - [AWS Lambda Documentation](https://docs.aws.amazon.com/lambda/)
 - [S3 Event Notifications](https://docs.aws.amazon.com/AmazonS3/latest/userguide/NotificationHowTo.html)
