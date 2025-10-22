@@ -1,0 +1,197 @@
+#Automação com AWS Lambda e S3
+
+##Introdução
+
+Este arquivo documenta meu aprendizado sobre automação usando AWS Lambda e S3. A integração desses serviços permite criar fluxos que processam arquivos automaticamente sem gerenciar servidores.
+
+---
+
+##AWS Lambda
+
+Serviço serverless que executa código em resposta a eventos:
+
+- Sem gerenciamento de servidor
+- Escalabilidade automática
+- Pagamento por uso (execução + duração)
+- Suporta Python, Node.js, Java, Go, etc
+
+---
+
+##Integração Lambda com S3
+
+S3 dispara Lambda automaticamente quando:
+- Arquivo é criado (PUT)
+- Arquivo é deletado
+- Arquivo é copiado
+
+Isso permite workflows automáticos de processamento.
+
+---
+
+##Casos de Uso
+
+### Processamento de Imagens
+
+1. Upload de foto no S3
+2. Lambda redimensiona automaticamente
+3. Salva resultado em outro bucket
+
+### Validação de Arquivos
+
+1. Upload de CSV
+2. Lambda valida formato
+3. Move para "processados" ou "erro"
+
+### Backup Automatizado
+
+1. Arquivo salvo no bucket primário
+2. Lambda copia para outra região automaticamente
+
+---
+
+## Exemplo: Processar Imagem
+
+```python
+import boto3
+from PIL import Image
+import io
+
+s3_client = boto3.client('s3')
+
+def lambda_handler(event, context):
+    # Obter info do evento
+    bucket = event['Records'][0]['s3']['bucket']['name']
+    key = event['Records'][0]['s3']['object']['key']
+    
+    # Baixar imagem
+    response = s3_client.get_object(Bucket=bucket, Key=key)
+    image = Image.open(io.BytesIO(response['Body'].read()))
+    
+    # Criar thumbnail
+    image.thumbnail((200, 200))
+    
+    # Salvar buffer
+    buffer = io.BytesIO()
+    image.save(buffer, 'JPEG')
+    buffer.seek(0)
+    
+    # Upload
+    s3_client.put_object(
+        Bucket='bucket-processado',
+        Key=f"thumbnails/{key}",
+        Body=buffer,
+        ContentType='image/jpeg'
+    )
+    
+    return {'statusCode': 200, 'body': 'Sucesso'}
+```
+
+---
+
+## Configurar Trigger S3
+
+Via CloudFormation:
+
+```yaml
+Resources:
+  ProcessFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.9
+      Handler: index.lambda_handler
+      Code:
+        ZipFile: |
+          # código
+
+  SourceBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      NotificationConfiguration:
+        LambdaConfigurations:
+          - Event: s3:ObjectCreated:*
+            Function: !GetAtt ProcessFunction.Arn
+            Filter:
+              S3Key:
+                Rules:
+                  - Name: suffix
+                    Value: .jpg
+```
+
+---
+
+## Permissões IAM
+
+Lambda precisa de role com permissões S3:
+
+```json
+{
+  "Effect": "Allow",
+  "Action": ["s3:GetObject", "s3:PutObject"],
+  "Resource": [
+    "arn:aws:s3:::bucket-origem/*",
+    "arn:aws:s3:::bucket-destino/*"
+  ]
+}
+```
+
+---
+
+## Boas Práticas
+
+Performance:
+- Criar cliente S3 fora do handler
+- Configurar timeout adequado
+- Alocar memória suficiente
+
+Confiabilidade:
+- Sempre tratar erros (try/except)
+- Função deve ser idempotente
+- Configurar Dead Letter Queue
+
+Custos:
+- Filtrar eventos (apenas arquivos necessários)
+- Otimizar tamanho do código
+- Usar layers para dependências
+
+---
+
+## Monitoramento
+
+CloudWatch captura automaticamente:
+- Número de invocações
+- Duração
+- Erros
+- Throttles
+
+---
+
+## Limitações
+
+**Lambda**:
+- Tempo máximo: 15 minutos
+- Memória: 128MB a 10GB
+- Pacote: 50MB zipado
+
+**S3**:
+- Objeto máximo: 5TB
+- 3.500 PUT/s por prefixo
+- 5.500 GET/s por prefixo
+
+---
+
+## Principais Aprendizados
+
+- Lambda + S3 automatiza processamento sem servidores
+- Event-driven architecture simplifica coordenação
+- Permissões IAM devem ser específicas
+- Tratamento de erro é essencial
+- Monitoramento via CloudWatch facilita debug
+- Filtrar eventos otimiza custos
+
+---
+
+## Recursos
+
+- [AWS Lambda Documentation](https://docs.aws.amazon.com/lambda/)
+- [S3 Event Notifications](https://docs.aws.amazon.com/AmazonS3/latest/userguide/NotificationHowTo.html)
+- [Lambda Best Practices](https://docs.aws.amazon.com/lambda/latest/dg/best-practices.html)
